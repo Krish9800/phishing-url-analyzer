@@ -1,5 +1,6 @@
 """Data models package for URL analysis."""
 
+from phish_analyzer.models.heuristic import HeuristicSeverity, HeuristicTrigger
 from phish_analyzer.models.url_record import ParsedURL
 
-__all__ = ["ParsedURL"]
+__all__ = ["HeuristicSeverity", "HeuristicTrigger", "ParsedURL"]
