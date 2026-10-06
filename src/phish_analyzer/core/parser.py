@@ -103,13 +103,14 @@ class URLParser:
             except (idna.IDNAError, UnicodeError):
                 decoded_punycode = None
 
-        # Decompose domain labels
+        # Decompose domain labels (stripping optional FQDN trailing dot)
+        clean_host = hostname.rstrip(".")
         subdomains: list[str] = []
         registered_domain = ""
         tld = ""
 
-        if not has_ip_host and "." in hostname:
-            labels = hostname.split(".")
+        if not has_ip_host and "." in clean_host:
+            labels = clean_host.split(".")
             # Check two-part TLD match
             if len(labels) >= 3 and ".".join(labels[-2:]) in TWO_PART_TLDS:
                 tld = ".".join(labels[-2:])
@@ -121,9 +122,9 @@ class URLParser:
                 subdomains = labels[:-2]
             else:
                 tld = labels[-1]
-                registered_domain = hostname
+                registered_domain = clean_host
         elif not has_ip_host:
-            registered_domain = hostname
+            registered_domain = clean_host
 
         # Calculate lexical entropies
         domain_entropy = calculate_shannon_entropy(registered_domain or hostname)

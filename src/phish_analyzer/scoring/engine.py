@@ -64,7 +64,11 @@ class ScoringEngine:
                 "and reject authority masking."
             )
 
-        if "HIGH_RISK_TLD" in rule_ids or "SUBDOMAIN_STUFFING" in rule_ids:
+        if (
+            "HIGH_RISK_TLD" in rule_ids
+            or "SUBDOMAIN_STUFFING" in rule_ids
+            or "HIGH_DOMAIN_ENTROPY" in rule_ids
+        ):
             recs.append(
                 "Isolate sessions targeting newly observed high-risk TLDs and dynamic DNS "
                 "providers using Remote Browser Isolation (RBI)."
