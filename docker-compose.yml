@@ -1,0 +1,31 @@
+services:
+  phish-analyzer-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: phish-analyzer-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PHISH_DEBUG=false
+      - PHISH_SHANNON_ENTROPY_THRESHOLD=4.0
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
