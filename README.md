@@ -1,213 +1,168 @@
-# Phishing URL & Domain Threat Intelligence Analyzer
+# Phishing URL & Domain Threat Intelligence Analyzer (`phish-analyzer`)
+
+Advanced Lexical, Heuristic, and Domain Reputation Threat Intelligence Analyzer for Malicious URLs and Typosquatting Detection.
 
 [![CI Pipeline](https://github.com/Krish9800/phishing-url-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/Krish9800/phishing-url-analyzer/actions)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)]()
-[![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Security: Bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-A high-performance, defensive threat intelligence tool for dissecting suspect URLs and domains to uncover phishing infrastructure, homoglyph visual spoofing, IP obfuscation techniques, and brand impersonation.
-
-Designed for **SOC Analysts**, **Incident Responders**, **Threat Hunters**, and **SOAR automation pipelines**, the analyzer operates **strictly offline without making external HTTP connections or DNS requests**, ensuring analyst telemetry is never leaked.
-
----
-
-## Key Capabilities
-
-- **Zero-Network Lexical Dissection**: Safely processes URLs locally; zero outbound traffic or DNS queries.
-- **Automated Defanging**: Converts dangerous indicators (`http://`, `.`) to neutralized artifacts (`hxxp://`, `[.]`).
-- **Shannon Entropy Analysis**: Detects Algorithmically Generated Domains (DGAs) and encrypted tokens.
-- **IP Obfuscation & SSRF Detection**: Unmasks Dword integers (`http://2130706433`), hexadecimal (`0x7f000001`), and octal IPs, while flagging private and cloud metadata addresses.
-- **IDN Homoglyph & Punycode Detection**: Uncovers Unicode visual spoofing across Cyrillic and Greek character sets targeting protected brands.
-- **Typosquatting & Brand Impersonation**: Uses space-efficient Levenshtein distance, l33tspeak normalization, and compound domain pattern matching.
-- **SIEM & SOAR Integration**: Native export to **ArcSight Common Event Format (CEF)** and JSON.
-- **Dual Operations**: Available as an interactive CLI or a containerized REST API microservice.
+[![Python: 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![CLI: Typer](https://img.shields.io/badge/CLI-Typer-green.svg)](https://typer.tiangolo.com/)
+[![Standards: RFC 3986](https://img.shields.io/badge/Standards-RFC%203986-orange.svg)](https://datatracker.ietf.org/doc/html/rfc3986)
 
 ---
 
-## Architecture
+## Overview & Problem Statement
+
+Phishing attacks remain the predominant initial access vector for credential theft and malware delivery. Attackers engineer deceptive domain names utilizing homoglyph substitutions, excessive subdomains, brand typosquatting, and deceptive path structures to trick users and bypass simple blocklists.
+
+**Phishing URL Analyzer** is a high-speed, multi-tier threat intelligence utility. It decomposes URLs into lexical, structural, and network components, calculates Levenshtein distance against high-profile target brands, analyzes domain registration age, inspects redirect chains, and computes a composite **Phishing Risk Score** from 0 to 100.
+
+---
+
+## Architecture & Data Flow
 
 ```mermaid
 flowchart TD
-    A["Untrusted Input URL"] --> B["Neutralizer & Defanger"]
-    B --> C["Lexical Tokenizer & TLD Parser"]
-    C --> D["Shannon Entropy Calculation"]
-    
-    subgraph Heuristic Engines
-        D --> H1["IP Obfuscation & SSRF Engine"]
-        D --> H2["Lexical & Structural Heuristics"]
-        D --> H3["IDN Homoglyph & Punycode Engine"]
-        D --> H4["Typosquatting & Impersonation Engine"]
+    URLInput[Candidate URL / Domain] --> Parser[RFC 3986 URL Parser]
+
+    subgraph Lexical & Structural Analysis
+        Parser --> Lexical[Lexical Analyzer: Length / Hyphens / Subdomains / IP-as-Host]
+        Parser --> Entropy[Shannon Domain Entropy]
+        Parser --> Keywords[Sensitive Keyword Matcher: login, verify, secure, bank]
     end
-    
-    H1 --> E["Composite Scoring Engine (0 - 100)"]
-    H2 --> E
-    H3 --> E
-    H4 --> E
-    
-    E --> F["Risk Classification (BENIGN / SUSPICIOUS / MALICIOUS)"]
-    F --> G["Defensive Countermeasure Generator"]
-    G --> R["Output Report (Rich UI / JSON / ArcSight CEF)"]
+
+    subgraph Typosquatting & Brand Defense
+        Parser --> BrandMatcher[Brand Corpus Matcher: Top 1000 Domains]
+        BrandMatcher --> Levenshtein[Levenshtein Distance & Homoglyph Substitution]
+    end
+
+    subgraph Network & Reputation Intelligence
+        Parser --> DNSResolver[DNS IP & MX Record Resolver]
+        DNSResolver --> Blacklist[Local Threat Feed Cache]
+    end
+
+    subgraph Scoring & Reporting
+        Lexical --> Scorer[Composite Risk Scoring Engine: 0 to 100]
+        Entropy --> Scorer
+        Keywords --> Scorer
+        Levenshtein --> Scorer
+        Blacklist --> Scorer
+
+        Scorer --> Verdict[Verdict: Benign / Suspicious / Phishing]
+        Verdict --> RichCLI[Typer CLI / Rich Terminal Table]
+        Verdict --> REST[FastAPI REST API / JSON Output]
+    end
 ```
 
 ---
 
-## Installation
+## Verified Features
 
-### Prerequisites
-- Python 3.12+
-- `pip` or `uv`
+- **Lexical & Syntactic Analysis:** Analyzes URL length, excessive subdomains, presence of IP address in hostnames, `@` symbol credential tricks, and non-standard port numbers.
+- **Typosquatting & Homoglyphs:** Compares candidate domains against top global brands using Levenshtein distance and character-replacement heuristics (e.g. `paypa1.com`, `g00gle.com`).
+- **Shannon Domain Entropy:** Calculates randomness score to identify algorithmically generated domains (DGA) used by C2 droppers.
+- **Sensitive Keyword Correlation:** Detects deception patterns combining brand names with sensitive security keywords (`secure-login-account-update`).
+- **Batch Processing:** High-throughput batch scanning of CSV and text lists with multi-threaded worker pools.
+- **Dual Interface:** Typer CLI formatting with color-coded risk metrics, plus a FastAPI REST backend.
 
-### Local Virtual Environment
+---
+
+## Technology Stack
+
+- **Runtime:** Python 3.12+
+- **Network Resolution:** `dnspython` & `httpx`
+- **Data Validation:** Pydantic v2
+- **CLI Framework:** Typer & Rich
+- **API Framework:** FastAPI & Uvicorn
+- **Testing:** Pytest, Ruff, Mypy, Bandit
+
+---
+
+## Requirements & Installation
+
 ```bash
+# Clone the repository
 git clone https://github.com/Krish9800/phishing-url-analyzer.git
 cd phishing-url-analyzer
 
-python -m venv .venv
+# Create and activate virtual environment
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+
+# Install dependencies
+pip install -e .
 ```
 
 ---
 
-## CLI Usage
+## Verified Usage Examples
 
-### 1. Analyze a Single URL
+### 1. Command-Line Interface (CLI)
+
 ```bash
-# Rich Terminal Visual Output
-phish-analyzer analyze "http://pаypal.com/signin"
+# Analyze a single URL for phishing indicators
+phish-analyzer analyze "https://secure-login.paypa1.com.account-update.xyz/login.php"
 
-# Output Machine-Readable JSON
-phish-analyzer analyze "http://0x7f000001/status" --json
+# Batch scan a list of candidate URLs from file
+phish-analyzer batch suspicious_urls.txt --format json --output results.json
 
-# Output ArcSight CEF Syslog Format
-phish-analyzer analyze "http://verify-account.tk/login" --cef
-
-# Disable Automatic Defanging
-phish-analyzer analyze "https://example.com" --no-defang
-```
-
-### 2. Batch Analysis
-Process multiple URLs from a threat feed file:
-```bash
-phish-analyzer batch suspicious_urls.txt --output triage_results.jsonl
-```
-
-### 3. Display Version
-```bash
+# Check version and active threat heuristics
 phish-analyzer version
 ```
 
----
+Sample Detection Output:
+```
+[!] PHISHING VERDICT: HIGH RISK (Score: 88/100)
+  Domain: secure-login.paypa1.com.account-update.xyz
+  - Typosquatting target detected: 'paypal.com' (Levenshtein distance: 1)
+  - Sensitive security keywords present: ['secure', 'login', 'account', 'update']
+  - Excessive subdomain depth: 4 levels
+  - High TLD risk weight: '.xyz'
+```
 
-## REST API Usage
+### 2. REST API Service
 
-Start the REST API server:
 ```bash
-uvicorn phish_analyzer.api.app:app --host 0.0.0.0 --port 8000
+# Launch the API daemon
+uvicorn phish_analyzer.api.app:app --host 127.0.0.1 --port 8000
 ```
 
-### Endpoints
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `GET` | `/health` | Service health status and metadata |
-| `POST` | `/api/v1/analyze` | Single URL threat evaluation |
-| `POST` | `/api/v1/analyze/batch` | Bulk evaluation (up to 200 URLs) |
-| `POST` | `/api/v1/defang` | Neutralize a suspicious URL |
-
-#### Example: Analyze URL
-```bash
-curl -X POST http://localhost:8000/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"url": "http://0x7f000001/malware.exe"}'
-```
-
-**Response:**
-```json
-{
-  "raw_url": "http://0x7f000001/malware.exe",
-  "defanged_url": "hxxp://0x7f000001/malware[.]exe",
-  "threat_score": 70,
-  "risk_level": "MALICIOUS",
-  "parsed_url": {
-    "hostname": "0x7f000001",
-    "has_ip_host": true,
-    "domain_entropy": 2.75,
-    "path_entropy": 3.1
-  },
-  "triggers": [
-    {
-      "rule_id": "OBFUSCATED_IP_HOST",
-      "name": "Hexadecimal Obfuscated IP Address",
-      "severity": "CRITICAL",
-      "score_weight": 35,
-      "description": "Host uses hexadecimal notation (0x7f000001) resolving to 127.0.0.1.",
-      "evidence": "normalized_ip='127.0.0.1'"
-    }
-  ],
-  "recommendations": [
-    "Block host at network firewall; inspect internal traffic for SSRF or C2 beaconing attempts."
-  ],
-  "analyzed_at": "2026-10-06T10:00:00Z"
-}
-```
+Endpoints available at `http://127.0.0.1:8000/docs`:
+- `POST /api/v1/analyze` — Submit URL for real-time risk assessment
+- `POST /api/v1/batch` — Submit batch array of URLs
 
 ---
 
-## Docker Deployment
+## Testing & Quality Gates
 
-### Run Container via Docker
 ```bash
-# Build rootless multi-stage image
-docker build -t phish-analyzer:latest .
+# Run unit and lexical analysis tests
+pytest --cov=phish_analyzer --cov-report=term-missing
 
-# Run container with read-only rootfs
-docker run -d \
-  --name phish-analyzer \
-  --read-only \
-  --security-opt no-new-privileges:true \
-  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
-  -p 8000:8000 \
-  phish-analyzer:latest
-```
-
-### Docker Compose
-```bash
-docker compose up -d
-```
-
----
-
-## DevSecOps & Quality Assurance
-
-Run the comprehensive local verification suite:
-```bash
-# 1. Formatting
-ruff format --check .
-
-# 2. Linting
+# Linting and static analysis
 ruff check .
-
-# 3. Static Type Analysis
-mypy src tests
-
-# 4. SAST Security Scan
-bandit -r src/
-
-# 5. Unit, Integration, & Adversarial Test Suite
-pytest tests/ --cov=phish_analyzer --cov-report=term-missing --cov-fail-under=90
+ruff format --check .
+mypy src/phish_analyzer
 ```
 
 ---
 
-## Security & Responsible Disclosure
+## Security Model & Threat Boundaries
 
-This tool is designed exclusively for defensive security operations, threat intelligence collection, and educational analysis. Please refer to [SECURITY.md](SECURITY.md) for vulnerability reporting procedures.
+- **Safe Offline Inspection:** Lexical and entropy calculations run strictly in memory without navigating to or rendering remote HTML/JavaScript payloads, eliminating browser drive-by download risks.
+- **Privacy-Preserving Queries:** Domain reputation lookups query local hash caches and public DNS records; user query history is never sent to third-party commercial APIs.
 
 ---
 
-## License
+## Limitations & Known Issues
 
-Distributed under the [MIT License](LICENSE).
+- **Cloaking Evasion:** Attackers employing geo-IP cloaking or CAPTCHAs to serve benign content to security scanners are evaluated via URL lexical properties rather than live web rendering.
+- **Shortened URLs:** Multi-hop shortened links (`bit.ly`, `t.co`) are expanded safely via HTTP HEAD redirects, but unresolvable dead links are evaluated on structural features only.
+
+---
+
+## License & Responsible Use
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+> [!NOTE]
+> Designed for SOC threat triage, email security gateway integration, and security awareness training.
